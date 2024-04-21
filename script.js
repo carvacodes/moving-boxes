@@ -43,11 +43,11 @@ let boxArray = [];
  //          Event Listeners         //
 //////////////////////////////////////
 
-reset.addEventListener('mouseup', resetHandler);
-reset.addEventListener('touchend', resetHandler);
-
+reset.addEventListener('mousedown', resetHandler);
 document.addEventListener('mousedown', boxInteractHandler);
-document.addEventListener('touchstart', boxInteractHandler);
+
+reset.addEventListener('touchstart', resetHandler);
+document.addEventListener('touchstar', boxInteractHandler);
 
   //////////////////////////////////////
  //     Event Handler Functions      //
