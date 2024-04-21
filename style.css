@@ -1,20 +1,25 @@
 body {
-    margin: 0;
-    overflow: hidden;
-    background-color: rgb(10, 10, 10);
-    font-family: 'Montserrat';
-  }
-  
-  button {
-    font-family: 'Montserrat';
-    color: #efeaff;
-    background-color: #8878A8;
-  }
-  
-  div {
-    color: #efafff;
-    position: fixed;
-    top: 0;
-    left: 0;
-    z-index: 100;
-  }
+  margin: 0;
+  overflow: hidden;
+  background-color: rgb(10, 10, 10);
+  font-family: 'Montserrat';
+}
+
+button {
+  font-family: 'Montserrat';
+  color: #efeaff;
+  background-color: #8878A8;
+}
+
+div {
+  color: #efafff;
+  position: fixed;
+  top: 0px;
+  left: 0px;
+  z-index: 1000;
+}
+
+p {
+  margin: 5px;
+  padding: 0;
+}

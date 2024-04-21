@@ -5,8 +5,14 @@ https://codepen.io/taylorvowell/pen/BkxbC
 https://codepen.io/tmrDevelops/pen/YXNqOj
 */
 
-var canvas = document.getElementById('canvas');
-var ctx = canvas.getContext('2d');
+  //////////////////////////////////////
+ //      DOM Element Definitions     //
+//////////////////////////////////////
+
+// create canvas and context and set relevant variables
+
+let canvas = document.getElementById('canvas');
+let ctx = canvas.getContext('2d');
 
 canvas.width = innerWidth;
 canvas.height = innerHeight;
@@ -16,11 +22,148 @@ window.onresize = function() {
   canvas.height = innerHeight;
 }
 
-var idCounter = 0, clickCounter = 0, hitCounter = 0;
+// GUI elements
+let stats = document.getElementById('stats');
+let reset = document.getElementById('reset');
+
+// background gradient definition
+let bgGrad = ctx.createLinearGradient(0, 0, innerWidth, innerHeight);
+bgGrad.addColorStop(0,'rgb(53, 7, 83)');
+bgGrad.addColorStop(0.5,'rgb(131, 7, 81)');
+bgGrad.addColorStop(1,'rgb(107, 10, 110)');
+
+  //////////////////////////////////////
+ //       Global Game Variables      //
+//////////////////////////////////////
+
+let clickCounter = 0, hitCounter = 0, accuracy = 0, completeCount = 0;
+let boxArray = [];
+
+  //////////////////////////////////////
+ //          Event Listeners         //
+//////////////////////////////////////
+
+reset.addEventListener('mouseup', resetHandler);
+reset.addEventListener('touchend', resetHandler);
+
+document.addEventListener('mousedown', boxInteractHandler);
+document.addEventListener('touchstart', boxInteractHandler);
+
+  //////////////////////////////////////
+ //     Event Handler Functions      //
+//////////////////////////////////////
+
+// handle clicks of the reset button
+function resetHandler() {
+  hitCounter = 0;
+  clickCounter = 0;
+  boxArray = [];
+  boxArray.push(new Box(null, null, 100));
+  updateStats();
+}
+
+// handle the user interacting with a box
+function boxInteractHandler(e) {
+  e.preventDefault();
+
+  for (let i = 0; i < boxArray.length; i++) {
+    let item = boxArray[i];
+
+    // if you clicked within an item's bounding box
+    if (e.clientX >= item.bbox.left && 
+        e.clientX <= item.bbox.right && 
+        e.clientY >= item.bbox.top && 
+        e.clientY <= item.bbox.bottom) {
+      // if the item is not complete, split it and add increment the hit counter
+      if (!item.complete) {
+        item.splitMe(i);
+        hitCounter++;
+      } else {
+        // if the item is complete, decrement the hit counter (so that the player isn't penalized for clicking a completed item)
+        clickCounter--;
+        item.flash();
+      }
+    }
+  }
+  
+  clickCounter++;
+  updateStats();
+}
+
+  //////////////////////////////////////
+ //    Draw and Animate Functions    //
+//////////////////////////////////////
+
+let currentTime = Date.now();
+
+function draw() {
+  let frameTime = Date.now();
+
+  // lock to 60 fps; if fewer than 16 ms have passed, requestAnimationFrame again with no updates; otherwise, do all updates;
+  if (frameTime - currentTime < 16) {
+    window.requestAnimationFrame(draw);
+    return;
+  } else {
+    currentTime = frameTime;
+
+    // draw the background
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, innerWidth, innerHeight);
+
+    for (let j = 0; j < boxArray.length; j++) {
+      let box = boxArray[j];
+
+      // draw "non-complete boxes" with a rectangle
+      if (!box.complete) {
+        ctx.strokeStyle = 'rgb(' + box.r + ',' + box.g + ',' + box.b +  ')';
+        ctx.lineWidth = box.strokeWidth;
+        ctx.strokeRect(box.x, box.y, box.size, box.size);
+      } else {
+        // draw "complete boxes" as circles instead
+        box.updateColor(); // update the gradient
+
+        // draw
+        ctx.fillStyle = 'rgb(' + box.r + ',' + box.g + ',' + box.b +  ')';
+        ctx.beginPath();
+        ctx.ellipse(box.x + box.size / 2, box.y + box.size / 2, box.size / 2, box.size / 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // move the item
+      box.moveToPoint();
+    }
+
+    window.requestAnimationFrame(draw);
+  }
+}
+
+  //////////////////////////////////////
+ //        GUI Update Function       //
+//////////////////////////////////////
+
+function updateStats(){
+  clickToHitRatio = Math.round((hitCounter / clickCounter) * 100);
+  let accuracyText = clickToHitRatio ? Math.min(100, clickToHitRatio) : 0;
+  stats.textContent = 'Clicks: ' + clickCounter + ' | Hits: ' + hitCounter + ' | Complete: ' + completeCount + ' | Accuracy: ' + accuracyText + '%';
+}
+
+  //////////////////////////////////////
+ //     Initialization Function      //
+//////////////////////////////////////
+
+function init() {
+  updateStats();
+  boxArray.push(new Box(null, null, 100));
+
+  draw();
+}
+
+  //////////////////////////////////////
+ //       Prototype Definition       //
+//////////////////////////////////////
 
 function Box (x, y, size) {
-  this.myID = idCounter;
-  idCounter++;
+  // set vars
   this.size = size || 100;
   this.x = x || Math.random() * (innerWidth - this.size);
   this.y = y || Math.random() * (innerHeight - this.size);
@@ -32,11 +175,26 @@ function Box (x, y, size) {
   this.strokeWidth = this.size * 0.2;
   this.speed = 100 / this.size;
   this.bbox = {};
+  this.complete = false;
+
+  // colorDirections indicate either decreasing (-1) or increasing (1) colors for completed boxes
+  this.colorDirections = {
+    r: 1,
+    g: 1,
+    b: 1
+  }
   
+  // randomly choose a new point to move to
   this.pickNewPoint = function() {
-    if (Math.random() < 0.5) {
+    // non-complete boxes: new point is locked to either a new X *or* a new Y position, but never both
+    if (!this.complete) {
+      if (Math.random() < 0.5) {
+        this.ptx = Math.random() * (innerWidth - this.size);
+      } else {
+        this.pty = Math.random() * (innerHeight - this.size);
+      }
+    } else { // complete boxes can move diagonally; new point is not exclusive to one axis
       this.ptx = Math.random() * (innerWidth - this.size);
-    } else {
       this.pty = Math.random() * (innerHeight - this.size);
     }
   };
@@ -58,6 +216,7 @@ function Box (x, y, size) {
     this.updateBBox();
   };
   
+  // update the bounding box coordinates
   this.updateBBox = function() {
     this.bbox.left = this.x - this.strokeWidth;
     this.bbox.right = this.x + this.size + this.strokeWidth;
@@ -66,78 +225,46 @@ function Box (x, y, size) {
   };
   
   this.splitMe = function(index) {
-    var nextX = this.x;
-    var nextY = this.y;
-    if (this.size > 10) {
+    if (this.size > 20) {
+      let nextX = this.x;
+      let nextY = this.y;
       boxArray.push(new Box(nextX, nextY, this.size - 10));
       boxArray.push(new Box(nextX, nextY, this.size - 10));
       boxArray.splice(index, 1);
     } else {
       this.speed = 1;
-      this.r = 255;
-      this.g = 168;
-      this.b = 168;
+      this.complete = true;
+      completeCount++;
     }
   };
-}
 
-var stats = document.getElementById('stats');
-var updateStats = function(){
-  stats.textContent = 'Clicks: ' + clickCounter + ' | Hits: ' + hitCounter + ' | Accuracy: ' + (Math.round((hitCounter / clickCounter) * 100) || '0') + '%';
-}
-updateStats();
+  this.updateColor = function() {
+    this.colorDirections.r *= this.r >= 255 || this.r <= 50 ? -1 : 1;
+    this.colorDirections.g *= this.g >= 255 || this.g <= 50 ? -1 : 1;
+    this.colorDirections.b *= this.b >= 255 || this.b <= 50 ? -1 : 1;
 
-var boxArray = [];
-boxArray.push(new Box(null, null, 100));
+    this.r += this.colorDirections.r;
+    this.g += this.colorDirections.g;
+    this.b += this.colorDirections.b;
+  };
 
-var reset = document.getElementById('reset');
-reset.addEventListener('click', function(){
-  hitCounter = 0;
-  clickCounter = 0;
-  idCounter = 0;
-  boxArray = [];
-  boxArray.push(new Box(null, null, 100));
-  updateStats();
-})
-
-document.addEventListener('mousedown',function(e){
-  e.preventDefault();
-  for (var i = 0; i < boxArray.length; i++) {
-    if (e.clientX >= boxArray[i].bbox.left && 
-        e.clientX <= boxArray[i].bbox.right && 
-        e.clientY >= boxArray[i].bbox.top && 
-        e.clientY <= boxArray[i].bbox.bottom) {
-      boxArray[i].splitMe(i);
-      hitCounter++;
+  this.flash = function() {
+    let rand = Math.random();
+    if (rand <= 0.333) {
+      this.r = 255;
+      this.g = this.b = 52;
+    } else if (rand > 0.333 && rand <= 0.667 ) {
+      this.g = 255;
+      this.r = this.b = 52;
+    } else {
+      this.b = 255;
+      this.r = this.g = 52;
     }
   }
-  clickCounter++;
-  updateStats();
-})
-
-var bgGrad = ctx.createLinearGradient(0, 0, innerWidth, innerHeight);
-bgGrad.addColorStop(0,'rgb(48,12,36)');
-bgGrad.addColorStop(0.5,'rgb(36,12,48)');
-bgGrad.addColorStop(1,'rgb(8,16,26)');
-
-function draw() {
-  ctx.fillStyle = bgGrad;
-  ctx.fillRect(0, 0, innerWidth, innerHeight);
-  for (var j = 0; j < boxArray.length; j++) {
-    ctx.strokeStyle = 'rgb(' + boxArray[j].r + ',' + boxArray[j].g + ',' + boxArray[j].b +  ')';
-    ctx.lineWidth = boxArray[j].strokeWidth;
-    ctx.strokeRect(boxArray[j].x, boxArray[j].y, boxArray[j].size, boxArray[j].size);
-    boxArray[j].moveToPoint();
-  }
-   window.requestAnimFrame = function(){
-    return (
-        window.requestAnimationFrame(draw)       || 
-        window.webkitRequestAnimationFrame(draw) || 
-        window.mozRequestAnimationFrame(draw)    || 
-        window.oRequestAnimationFrame(draw)      || 
-        window.msRequestAnimationFrame(draw)
-    );
-}();
 }
 
-draw();
+  //////////////////////////////////////
+ //          Initialization          //
+//////////////////////////////////////
+
+window.addEventListener('load', init);
