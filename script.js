@@ -24,7 +24,7 @@ window.onresize = function() {
 
 // GUI elements
 let stats = document.getElementById('stats');
-let reset = document.getElementById('reset');
+let resetButton = document.getElementById('reset');
 
 // background gradient definition
 let bgGrad = ctx.createLinearGradient(0, 0, innerWidth, innerHeight);
@@ -37,17 +37,17 @@ bgGrad.addColorStop(1,'rgb(107, 10, 110)');
 //////////////////////////////////////
 
 let clickCounter = 0, hitCounter = 0, accuracy = 0, completeCount = 0;
-let boxArray = [];
+let itemArray = [];
 
   //////////////////////////////////////
  //          Event Listeners         //
 //////////////////////////////////////
 
-reset.addEventListener('mousedown', resetHandler);
-window.addEventListener('mousedown', boxInteractHandler);
+resetButton.addEventListener('mousedown', resetHandler);
+window.addEventListener('mousedown', itemInteractHandler);
 
-reset.addEventListener('touchstart', resetHandler);
-window.addEventListener('touchstart', boxInteractHandler);
+resetButton.addEventListener('touchstart', resetHandler);
+window.addEventListener('touchstart', itemInteractHandler);
 
   //////////////////////////////////////
  //     Event Handler Functions      //
@@ -57,17 +57,24 @@ window.addEventListener('touchstart', boxInteractHandler);
 function resetHandler() {
   hitCounter = 0;
   clickCounter = 0;
-  boxArray = [];
-  boxArray.push(new Box(null, null, 100));
+  completeCount = 0;
+  itemArray = [];
+  itemArray.push(new Item(null, null, 100));
   updateStats();
 }
 
-// handle the user interacting with a box
-function boxInteractHandler(e) {
+// handle the user interacting with an item
+function itemInteractHandler(e) {
   e.preventDefault();
+  let clickedCompleted = false;
 
-  for (let i = 0; i < boxArray.length; i++) {
-    let item = boxArray[i];
+  // don't penalize the player for clicking the reset button
+  if (e.target.id == 'reset') {
+    return;
+  }
+
+  for (let i = 0; i < itemArray.length; i++) {
+    let item = itemArray[i];
 
     // if you clicked within an item's bounding box
     if (e.clientX >= item.bbox.left && 
@@ -80,13 +87,13 @@ function boxInteractHandler(e) {
         hitCounter++;
       } else {
         // if the item is complete, decrement the hit counter (so that the player isn't penalized for clicking a completed item)
-        clickCounter--;
+        clickedCompleted = true;
         item.flash();
       }
     }
   }
-  
-  clickCounter++;
+
+  if (!clickedCompleted) { clickCounter++; }
   updateStats();
 }
 
@@ -110,27 +117,27 @@ function draw() {
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, innerWidth, innerHeight);
 
-    for (let j = 0; j < boxArray.length; j++) {
-      let box = boxArray[j];
+    for (let j = 0; j < itemArray.length; j++) {
+      let item = itemArray[j];
 
-      // draw "non-complete boxes" with a rectangle
-      if (!box.complete) {
-        ctx.strokeStyle = 'rgb(' + box.r + ',' + box.g + ',' + box.b +  ')';
-        ctx.lineWidth = box.strokeWidth;
-        ctx.strokeRect(box.x, box.y, box.size, box.size);
+      // draw "non-complete" items with a rectangle
+      if (!item.complete) {
+        ctx.strokeStyle = 'rgb(' + item.r + ',' + item.g + ',' + item.b +  ')';
+        ctx.lineWidth = item.strokeWidth;
+        ctx.strokeRect(item.x, item.y, item.size, item.size);
       } else {
-        // draw "complete boxes" as circles instead
-        box.updateColor(); // update the gradient
+        // draw "complete" items as circles instead
+        item.updateColor(); // update the gradient
 
         // draw
-        ctx.fillStyle = 'rgb(' + box.r + ',' + box.g + ',' + box.b +  ')';
+        ctx.fillStyle = 'rgb(' + item.r + ',' + item.g + ',' + item.b +  ')';
         ctx.beginPath();
-        ctx.ellipse(box.x + box.size / 2, box.y + box.size / 2, box.size / 2, box.size / 2, 0, 0, Math.PI * 2);
+        ctx.ellipse(item.x + item.size / 2, item.y + item.size / 2, item.size / 2, item.size / 2, 0, 0, Math.PI * 2);
         ctx.fill();
       }
 
       // move the item
-      box.moveToPoint();
+      item.moveToPoint();
     }
 
     window.requestAnimationFrame(draw);
@@ -152,8 +159,7 @@ function updateStats(){
 //////////////////////////////////////
 
 function init() {
-  updateStats();
-  boxArray.push(new Box(null, null, 100));
+  resetHandler();
 
   draw();
 }
@@ -162,104 +168,106 @@ function init() {
  //       Prototype Definition       //
 //////////////////////////////////////
 
-function Box (x, y, size) {
-  // set vars
-  this.size = size || 100;
-  this.x = x || Math.random() * (innerWidth - this.size);
-  this.y = y || Math.random() * (innerHeight - this.size);
-  this.ptx = Math.random() * (innerWidth - this.size);
-  this.pty = Math.random() * (innerHeight - this.size);
-  this.r = Math.round(Math.random() * 200) + 55;
-  this.g = Math.round(Math.random() * 200) + 55;
-  this.b = 255;
-  this.strokeWidth = this.size * 0.2;
-  this.speed = 100 / this.size;
-  this.bbox = {};
-  this.complete = false;
+class Item {
+  constructor(x, y, size) {
+    // set vars
+    this.size = size || 100;
+    this.x = x || Math.random() * (innerWidth - this.size);
+    this.y = y || Math.random() * (innerHeight - this.size);
+    this.ptx = Math.random() * (innerWidth - this.size);
+    this.pty = Math.random() * (innerHeight - this.size);
+    this.r = Math.round(Math.random() * 200) + 55;
+    this.g = Math.round(Math.random() * 200) + 55;
+    this.b = 255;
+    this.strokeWidth = this.size * 0.2;
+    this.speed = 100 / this.size;
+    this.bbox = {};
+    this.complete = false;
 
-  // colorDirections indicate either decreasing (-1) or increasing (1) colors for completed boxes
-  this.colorDirections = {
-    r: 1,
-    g: 1,
-    b: 1
-  }
-  
-  // randomly choose a new point to move to
-  this.pickNewPoint = function() {
-    // non-complete boxes: new point is locked to either a new X *or* a new Y position, but never both
-    if (!this.complete) {
-      if (Math.random() < 0.5) {
+    // colorDirections indicate either decreasing (-1) or increasing (1) colors for completed items
+    this.colorDirections = {
+      r: 1,
+      g: 1,
+      b: 1
+    };
+
+    // randomly choose a new point to move to
+    this.pickNewPoint = function () {
+      // non-complete items: new point is locked to either a new X *or* a new Y position, but never both
+      if (!this.complete) {
+        if (Math.random() < 0.5) {
+          this.ptx = Math.random() * (innerWidth - this.size);
+        } else {
+          this.pty = Math.random() * (innerHeight - this.size);
+        }
+      } else { // complete items can move diagonally; new point is not exclusive to one axis
         this.ptx = Math.random() * (innerWidth - this.size);
-      } else {
         this.pty = Math.random() * (innerHeight - this.size);
       }
-    } else { // complete boxes can move diagonally; new point is not exclusive to one axis
-      this.ptx = Math.random() * (innerWidth - this.size);
-      this.pty = Math.random() * (innerHeight - this.size);
-    }
-  };
-  
-  this.moveToPoint = function() {
-    if (this.x == this.ptx && this.y == this.pty) {
-      this.pickNewPoint();
-    }
-    if (Math.abs(this.x - this.ptx) <= this.speed) {
-      this.x = this.ptx;
-    } else {
-      this.x > this.ptx ? this.x -= this.speed : this.x += this.speed; 
-    }
-    if (Math.abs(this.y  - this.pty) <= this.speed) {
-      this.y = this.pty;
-    } else {
-      this.y > this.pty ? this.y -= this.speed : this.y += this.speed;
-    }
-    this.updateBBox();
-  };
-  
-  // update the bounding box coordinates
-  this.updateBBox = function() {
-    this.bbox.left = this.x - this.strokeWidth;
-    this.bbox.right = this.x + this.size + this.strokeWidth;
-    this.bbox.top = this.y - this.strokeWidth;
-    this.bbox.bottom = this.y + this.size + this.strokeWidth;
-  };
-  
-  this.splitMe = function(index) {
-    if (this.size > 20) {
-      let nextX = this.x;
-      let nextY = this.y;
-      boxArray.push(new Box(nextX, nextY, this.size - 10));
-      boxArray.push(new Box(nextX, nextY, this.size - 10));
-      boxArray.splice(index, 1);
-    } else {
-      this.speed = 1;
-      this.complete = true;
-      completeCount++;
-    }
-  };
+    };
 
-  this.updateColor = function() {
-    this.colorDirections.r *= this.r >= 255 || this.r <= 50 ? -1 : 1;
-    this.colorDirections.g *= this.g >= 255 || this.g <= 50 ? -1 : 1;
-    this.colorDirections.b *= this.b >= 255 || this.b <= 50 ? -1 : 1;
+    this.moveToPoint = function () {
+      if (this.x == this.ptx && this.y == this.pty) {
+        this.pickNewPoint();
+      }
+      if (Math.abs(this.x - this.ptx) <= this.speed) {
+        this.x = this.ptx;
+      } else {
+        this.x > this.ptx ? this.x -= this.speed : this.x += this.speed;
+      }
+      if (Math.abs(this.y - this.pty) <= this.speed) {
+        this.y = this.pty;
+      } else {
+        this.y > this.pty ? this.y -= this.speed : this.y += this.speed;
+      }
+      this.updateBBox();
+    };
 
-    this.r += this.colorDirections.r;
-    this.g += this.colorDirections.g;
-    this.b += this.colorDirections.b;
-  };
+    // update the bounding box coordinates
+    this.updateBBox = function () {
+      this.bbox.left = this.x - this.strokeWidth;
+      this.bbox.right = this.x + this.size + this.strokeWidth;
+      this.bbox.top = this.y - this.strokeWidth;
+      this.bbox.bottom = this.y + this.size + this.strokeWidth;
+    };
 
-  this.flash = function() {
-    let rand = Math.random();
-    if (rand <= 0.333) {
-      this.r = 255;
-      this.g = this.b = 52;
-    } else if (rand > 0.333 && rand <= 0.667 ) {
-      this.g = 255;
-      this.r = this.b = 52;
-    } else {
-      this.b = 255;
-      this.r = this.g = 52;
-    }
+    this.splitMe = function (index) {
+      if (this.size > 20) {
+        let nextX = this.x;
+        let nextY = this.y;
+        itemArray.push(new Item(nextX, nextY, this.size - 10));
+        itemArray.push(new Item(nextX, nextY, this.size - 10));
+        itemArray.splice(index, 1);
+      } else {
+        this.speed = 1;
+        this.complete = true;
+        completeCount++;
+      }
+    };
+
+    this.updateColor = function () {
+      this.colorDirections.r *= this.r >= 255 || this.r <= 50 ? -1 : 1;
+      this.colorDirections.g *= this.g >= 255 || this.g <= 50 ? -1 : 1;
+      this.colorDirections.b *= this.b >= 255 || this.b <= 50 ? -1 : 1;
+
+      this.r += this.colorDirections.r;
+      this.g += this.colorDirections.g;
+      this.b += this.colorDirections.b;
+    };
+
+    this.flash = function () {
+      let rand = Math.random();
+      if (rand <= 0.333) {
+        this.r = 255;
+        this.g = this.b = 52;
+      } else if (rand > 0.333 && rand <= 0.667) {
+        this.g = 255;
+        this.r = this.b = 52;
+      } else {
+        this.b = 255;
+        this.r = this.g = 52;
+      }
+    };
   }
 }
 
