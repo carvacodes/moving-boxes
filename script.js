@@ -47,7 +47,7 @@ resetButton.addEventListener('mousedown', resetHandler);
 window.addEventListener('mousedown', itemInteractHandler);
 
 resetButton.addEventListener('touchstart', resetHandler);
-window.addEventListener('touchstart', itemInteractHandler);
+window.addEventListener('touchstart', itemInteractHandler, {passive: false});
 
   //////////////////////////////////////
  //     Event Handler Functions      //
@@ -65,7 +65,10 @@ function resetHandler() {
 
 // handle the user interacting with an item
 function itemInteractHandler(e) {
-  e.preventDefault();
+  if (e.changedTouches) {
+    e.preventDefault();
+    e = e.touches[0];
+  }
   let clickedCompleted = false;
 
   // don't penalize the player for clicking the reset button
